@@ -56,6 +56,16 @@ export function GenerationForm({
           Generate a new image
         </h2>
         <div className="space-y-5">
+          <Field label="Image model" error={fieldErrors.provider}>
+            <select
+              name="provider"
+              defaultValue="pollinations"
+              className="w-full rounded-md border border-[#d1d5db] bg-white px-3 py-2 text-sm text-[#374151]"
+            >
+              <option value="pollinations">Free (Pollinations)</option>
+              <option value="gemini">Gemini (API key required)</option>
+            </select>
+          </Field>
           <Field label="Page from URL" error={fieldErrors.pageUrl}>
             <select
               name="pageUrl"

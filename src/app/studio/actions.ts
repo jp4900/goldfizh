@@ -18,6 +18,7 @@ import {
   createGeminiImageGenerator,
   ImageGenerationError,
 } from "@/lib/gemini/gemini-image-generator";
+import { generatePollinationsImage } from "@/lib/pollinations/image-generator";
 import type { GenerationDTO, GenerationRequest } from "@/lib/studio/types";
 
 export type GenerateImageState =
@@ -25,8 +26,6 @@ export type GenerateImageState =
   | { status: "invalid"; fieldErrors: Record<string, string> }
   | { status: "failed"; code: string; message: string }
   | { status: "succeeded"; generation: GenerationDTO };
-
-const generator = createGeminiImageGenerator();
 
 export async function generateImageAction(
   _prev: GenerateImageState,
@@ -44,6 +43,7 @@ export async function generateImageAction(
     };
   }
 
+  const provider = parsed.data.provider;
   const request: GenerationRequest = {
     pageUrl: parsed.data.pageUrl,
     brandSegment: parsed.data.brandSegment,
@@ -69,12 +69,14 @@ export async function generateImageAction(
   }
 
   const env = getServerEnv();
+  const modelLabel =
+    provider === "gemini" ? env.GEMINI_IMAGE_MODEL : "pollinations";
   const spec = composePrompt(
     context.vision,
     context.brand,
     context.referenceAssets,
     request,
-    env.GEMINI_IMAGE_MODEL,
+    modelLabel,
   );
 
   const generationId = await createPendingGeneration(session, spec);
@@ -83,15 +85,23 @@ export async function generateImageAction(
   const timeout = setTimeout(() => controller.abort(), 55_000);
 
   try {
-    const result = await generator.generate(
-      spec,
-      context.referenceAssets,
-      controller.signal,
-    );
+    const result =
+      provider === "gemini"
+        ? await createGeminiImageGenerator().generate(
+            spec,
+            context.referenceAssets,
+            controller.signal,
+          )
+        : await generatePollinationsImage(
+            spec.prompt,
+            spec.aspectRatio,
+            controller.signal,
+          );
     const storagePath = await uploadGenerationImage(
       session.tenantId,
       generationId,
       result.bytes,
+      result.mimeType,
     );
     const generation = await markGenerationSucceeded(
       generationId,

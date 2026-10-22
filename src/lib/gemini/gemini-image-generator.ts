@@ -67,7 +67,14 @@ function buildParts(
 
 export function createGeminiImageGenerator() {
   const env = getServerEnv();
-  const client = new GoogleGenAI({ apiKey: env.GEMINI_API_KEY });
+  const apiKey = env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new ImageGenerationError(
+      "provider_error",
+      "GEMINI_API_KEY is not configured",
+    );
+  }
+  const client = new GoogleGenAI({ apiKey });
 
   return {
     async generate(

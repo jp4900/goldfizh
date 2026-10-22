@@ -4,8 +4,13 @@ const hexColor = z
   .string()
   .regex(/^#[0-9A-Fa-f]{6}$/, "Invalid color");
 
+export const imageProviderSchema = z.enum(["pollinations", "gemini"]);
+
+export type ImageProvider = z.infer<typeof imageProviderSchema>;
+
 export const generationRequestSchema = z
   .object({
+    provider: imageProviderSchema.default("pollinations"),
     pageUrl: z.string().min(1),
     brandSegment: z.string().min(1),
     style: z.enum(["simple", "abstract", "other"]),
@@ -44,6 +49,7 @@ export function parseGenerationRequest(
   allowedSegments: string[],
 ): ParsedGenerationRequest {
   const raw = {
+    provider: String(formData.get("provider") ?? "pollinations"),
     pageUrl: String(formData.get("pageUrl") ?? ""),
     brandSegment: String(formData.get("brandSegment") ?? ""),
     style: String(formData.get("style") ?? ""),

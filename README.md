@@ -2,7 +2,7 @@
 
 - Next.js 16 (App Router), TypeScript, Tailwind CSS 4
 - Supabase (PostgreSQL + Storage)
-- Google Gemini **Nano Banana 2.1** (`gemini-nano-banana-2.1`) via `@google/genai`
+- Image generation: **Pollinations** (default, for demos) or **Google Gemini Nano Banana 2.1** (`gemini-nano-banana-2.1`) via `@google/genai`
 
 ## Quick start
 
@@ -35,9 +35,12 @@ Open [http://localhost:3000/studio](http://localhost:3000/studio). The home rout
 |----------|----------|-------------|
 | `NEXT_PUBLIC_SUPABASE_URL` | Yes | Supabase project URL |
 | `SUPABASE_SECRET_KEY` | Yes | Service role key (server only) |
-| `GEMINI_API_KEY` | Yes | Google AI API key |
+| `POLLINATIONS_API_KEY` | Recommended | Secret key (`sk_…`) from [enter.pollinations.ai](https://enter.pollinations.ai). Uses `gen.pollinations.ai` and is much more reliable than the anonymous endpoint (especially on Vercel). Free tier Pollen is enough for a few test images. |
+| `GEMINI_API_KEY` | For Gemini only | Required when **Image model → Gemini** is selected in the studio |
 | `GEMINI_IMAGE_MODEL` | No | Defaults to `gemini-nano-banana-2.1` |
 | `SUPABASE_DB_PASSWORD` | For CLI | Database password for `supabase db push` |
+
+Supabase vars are always required. You can run the studio with Pollinations only (no `GEMINI_API_KEY`) as long as **Free (Pollinations)** is selected.
 
 Auth and tenants are **mocked** via a demo session cookie. Swap [`src/lib/session.ts`](src/lib/session.ts) and [`src/lib/demo-sessions.ts`](src/lib/demo-sessions.ts) for real Supabase Auth when integrating into the platform.
 
@@ -49,21 +52,30 @@ flowchart LR
   Brand["Brand profile + references"] --> Compiler
   Request["User form"] --> Compiler
   Compiler --> DB["generations snapshot"]
+  Compiler --> Pollinations["Pollinations image API"]
   Compiler --> Gemini["Gemini image API"]
-  Gemini --> Storage["Supabase Storage"]
+  Pollinations --> Storage["Supabase Storage"]
+  Gemini --> Storage
 ```
 
 - **`src/app/studio/`** — route, Server Actions, request validation (`request-schema.ts`).
 - **`src/app/components/studio/`** — studio UI.
 - **`src/lib/studio/`** — types, format presets, `composePrompt`, and Supabase access in `data.ts`.
-- **`src/lib/gemini/`** — Gemini image generation.
+- **`src/lib/pollinations/`** — free-tier image fetch (`gen.pollinations.ai` when a key is set).
+- **`src/lib/gemini/`** — Gemini image generation (reference images + 2K output).
 - **`src/lib/`** — validated env (`env.ts`), Supabase client, mock session.
 - **Precedence:** vision + brand `avoid` lists are merged; user choices only affect allowed fields (page URL, segment, style/colors presets, main swatch, aspect ratio).
 - **Repeatability:** each row stores compiled prompt, layer version IDs, model config, and reference asset IDs.
 
-## Provider choice
+## Image providers
 
-**Gemini Nano Banana 2.1** supports multi-image references (brand style assets), explicit aspect ratios including **4:5**, and fast Flash-tier latency. Prompt compilation is **not** delegated to an LLM so results stay auditable and testable (`compose-prompt.test.ts`).
+The studio form includes an **Image model** dropdown. Both options use the same compiled prompt from `composePrompt`; only the backend call changes.
+
+**Free (Pollinations)** — default. Good for reviewers to try prompts, styles, and the full flow without a paid Gemini key. Uses a shortened prompt in the URL (full prompt is still stored on the generation row). Output is JPEG at up to 768px; brand reference files are not sent to Pollinations (they remain in the prompt text). Set `POLLINATIONS_API_KEY` for the supported API; without it, the legacy anonymous endpoint may rate-limit or return 503 on shared hosts.
+
+**Gemini** — production-oriented path: multi-image style references from Storage, aspect ratios including **4:5**, and **2K** output. Requires `GEMINI_API_KEY` and billing on the Google AI project.
+
+Prompt compilation is **not** delegated to an LLM so results stay auditable and testable (`compose-prompt.test.ts`).
 
 ## Demo data
 
@@ -76,7 +88,7 @@ Use the header dropdown to switch clients (tenants) and compare the same form ch
 
 ## Brand reference images (manual)
 
-After running `supabase/seed.sql`, two `brand_assets` rows exist but the files are not in Storage yet. Generation still works without them; with them, Gemini gets style references.
+After running `supabase/seed.sql`, two `brand_assets` rows exist but the files are not in Storage yet. Pollinations generation still works without them; with them, **Gemini** gets style references as image inputs.
 
 1. Open **Supabase Dashboard → Storage → `brand-assets`** (private bucket).
 2. Upload your images with these **exact object paths** (create folders as needed):

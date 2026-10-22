@@ -137,11 +137,13 @@ export async function uploadGenerationImage(
   tenantId: string,
   generationId: string,
   bytes: Uint8Array,
+  mimeType: string,
 ): Promise<string> {
-  const path = `${tenantId}/${generationId}.png`;
+  const extension = mimeType === "image/jpeg" ? "jpg" : "png";
+  const path = `${tenantId}/${generationId}.${extension}`;
   const supabase = createServiceSupabase();
   const { error } = await supabase.storage.from(generationsBucket).upload(path, bytes, {
-    contentType: "image/png",
+    contentType: mimeType,
     upsert: true,
   });
   if (error) {
